@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="M.A.S.A. local video pose inspection and annotation console.">
+  <title>M.A.S.A. — Command / Inspect</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/style.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to inspection</a>
+  <header class="masthead">
+    <div class="brand"><h1>M.A.S.A.</h1><p class="micro">Martial Arts Skeletal Annotation</p></div>
+    <div class="masthead-status"><span class="micro">Command / Inspect</span><p id="connection-status" role="status">Connecting to engine…</p></div>
+  </header>
+  <noscript><p class="notice">JavaScript is required to inspect footage and start analysis. All interface scripts are served by this app.</p></noscript>
+  <p id="app-error" class="notice error" role="alert" tabindex="-1" hidden></p>
+  <div class="console-layout">
+    <aside class="command-panel" aria-label="Source and analysis commands">
+      <section class="module" aria-labelledby="input-title">
+        <div class="section-heading"><span class="index">01</span><h2 id="input-title">Footage input</h2></div>
+        <fieldset id="source-fields" disabled>
+          <legend class="sr-only">Choose a source on the app host</legend>
+          <div class="source-modes">
+            <input id="mode-upload" type="radio" name="source-mode" value="upload" checked><label for="mode-upload">Upload video</label>
+            <input id="mode-local" type="radio" name="source-mode" value="local"><label for="mode-local">Local path</label>
+          </div>
+          <div id="upload-mode">
+            <form id="upload-form" novalidate>
+              <label for="upload-file">Video file</label>
+              <input id="upload-file" type="file" accept=".mp4,.mov,.avi,.mkv,.m4v,.webm" aria-describedby="upload-limit">
+              <p id="upload-limit" class="caption">MP4 / MOV / AVI / MKV / M4V / WebM  maximum 200 MiB</p>
+              <button type="submit" id="load-upload">Inspect upload</button>
+            </form>
+          </div>
+          <div id="local-mode" hidden>
+            <form id="local-form" novalidate>
+              <label for="local-path">Local video path</label>
+              <input id="local-path" type="text" autocomplete="off" spellcheck="false" placeholder="/path/to/Footage.mp4" aria-describedby="path-help">
+              <p id="path-help" class="caption">A path on the app host. No upload-size limit; the original file stays in place.</p>
+              <button type="submit" id="load-path">Inspect path</button>
+            </form>
+          </div>
+        </fieldset>
+        <p id="source-status" class="caption" role="status">No source selected.</p>
+        <details class="privacy"><summary>Processing &amp; provenance</summary><p>Analysis runs on this app’s host. An upload transfers footage to that host; a local path is read there. This is not an authenticated multi-user service.</p><p>Permission and source notes are saved in the manifest and ZIP, not watermarked onto the footage. Notes are not proof of ownership. Keep a local-path source unchanged during analysis and review.</p></details>
+      </section>
+      <section class="module" aria-labelledby="settings-title">
+        <div class="section-heading"><span class="index">02</span><h2 id="settings-title">Configure analysis</h2></div>
+        <form id="config-form" novalidate>
+          <fieldset id="config-fields" disabled>
+            <legend class="sr-only">Analysis settings and permission</legend>
+            <div class="label-with-help"><label for="model">Pose model</label><button type="button" class="info" aria-label="Compare Nano and Small pose models" aria-haspopup="dialog" aria-controls="model-help" data-dialog="model-help">i</button></div>
+            <select id="model"><option value="yolo11n-pose.pt">yolo11n-pose.pt  Nano</option><option value="yolo11s-pose.pt">yolo11s-pose.pt   Small</option></select>
+            <div class="form-grid">
+              <div><label for="tracker">Tracker</label><select id="tracker"><option value="botsort.yaml">botsort.yaml</option><option value="bytetrack.yaml">bytetrack.yaml</option></select></div>
+              <div><label for="device">Device</label><select id="device"><option value="cpu">cpu</option><option value="mps">mps</option></select></div>
+              <div><label for="start-s">Clip start (s)</label><input id="start-s" type="number" min="0" step="any" value="0" inputmode="decimal"></div>
+              <div><label for="end-s">Clip end (s)</label><input id="end-s" type="number" min="0" step="any" inputmode="decimal" aria-describedby="interval-help"></div>
+            </div>
+            <p id="interval-help" class="caption">Use a nonempty interval within the source, at most 120 seconds.</p>
+            <div class="label-with-help"><label for="confidence">Detection confidence <output id="confidence-value" for="confidence">0.25</output></label><button type="button" class="info" aria-label="About detection confidence" aria-haspopup="dialog" aria-controls="detection-help" data-dialog="detection-help">i</button></div>
+            <input id="confidence" type="range" min="0.01" max="1" step="0.01" value="0.25">
+            <div class="label-with-help"><label for="keypoint-confidence">Keypoint confidence <output id="keypoint-confidence-value" for="keypoint-confidence">0.35</output></label><button type="button" class="info" aria-label="About keypoint confidence" aria-haspopup="dialog" aria-controls="keypoint-help" data-dialog="keypoint-help">i</button></div>
+            <input id="keypoint-confidence" type="range" min="0.01" max="1" step="0.01" value="0.35">
+            <div class="form-grid">
+              <div><label for="stride">Every Nth frame</label><input id="stride" type="number" min="1" max="120" step="1" value="1" inputmode="numeric"></div>
+              <div><label for="expected-people">Maximum people</label><select id="expected-people"><option value="1">1</option><option value="2" selected>2</option></select></div>
+            </div>
+            <label for="selection-mode">People selection</label>
+            <select id="selection-mode"><option value="manual" selected>Choose Fighter A / B</option><option value="automatic">Automatic confidence cap</option></select>
+            <div class="fighter-buttons"><button id="mark-fighter-a" type="button">Mark Fighter A</button><button id="mark-fighter-b" type="button">Mark Fighter B</button><button id="clear-fighters" type="button">Clear boxes</button></div>
+            <p id="fighter-selection-status" class="caption" role="status">Draw each fighter on the first analyzed source frame.</p>
+            <details><summary>Box coordinates / keyboard editing</summary><p id="fighter-coordinate-role" class="caption">Editing Fighter A in original source pixels.</p><div class="form-grid"><div><label for="box-x1">Left X</label><input id="box-x1" type="number" min="0" step="any"></div><div><label for="box-y1">Top Y</label><input id="box-y1" type="number" min="0" step="any"></div><div><label for="box-x2">Right X</label><input id="box-x2" type="number" min="0" step="any"></div><div><label for="box-y2">Bottom Y</label><input id="box-y2" type="number" min="0" step="any"></div></div><button id="apply-fighter-box" type="button">Apply box coordinates</button></details>
+            <p class="caption">Only selected tracks are exported. Missing fighters are flagged, not replaced. A/B are user labels; tracker IDs are not verified identities.</p>
+            <div class="permission-row"><input id="fixed-camera" type="checkbox"><label for="fixed-camera">I confirm this is a fixed-camera clip</label></div>
+            <p class="caption">Experimental movement phases require this confirmation. Camera motion can look like fighter motion; this is not camera-motion detection.</p>
+            <label for="source-note">Source note <span class="muted">(optional)</span></label>
+            <input id="source-note" type="text" autocomplete="off">
+            <div class="permission-row"><input id="permission" type="checkbox"><label for="permission">I have permission to process this footage</label></div>
+            <label for="rights-note">Rights / permission note <span class="muted">(optional)</span></label>
+            <textarea id="rights-note" rows="3" aria-describedby="permission-help"></textarea>
+            <p id="permission-help" class="caption">Explicit confirmation is required. Written notes are optional.</p>
+          </fieldset>
+          <button id="run-analysis" class="primary" type="submit" disabled>Run analysis</button>
+        </form>
+        <div id="job-panel" class="job-panel" aria-label="Analysis status">
+          <p id="job-status" role="status" aria-live="polite">Ready after source inspection and permission confirmation.</p>
+          <progress id="job-progress" max="1" value="0" aria-label="Analysis progress" hidden></progress>
+          <button id="resume-job" type="button" hidden>Retry status connection</button>
+        </div>
+      </section>
+    </aside>
+    <main id="workspace" class="inspect-panel" tabindex="-1">
+      <section class="module" aria-labelledby="source-title">
+        <div class="section-heading"><span class="index">03</span><h2 id="source-title">Inspect source</h2><span id="source-kind" class="micro"></span></div>
+        <div id="source-empty" class="empty-state"><p>Select footage to inspect its real frames.</p><p class="caption">Load an upload or a host-local path using the input panel. No analysis starts until you confirm permission and run it.</p></div>
+        <div id="source-panel" hidden>
+          <p id="source-name" class="technical source-name"></p>
+          <dl id="source-metadata" class="metadata"></dl>
+          <details><summary>Source video playback</summary><video id="source-video" controls preload="metadata" playsinline aria-label="Original source video"></video><p id="source-codec" class="caption">Browser playback depends on codec. PNG frame inspection works independently.</p></details>
+          <figure class="media-frame source-still"><div class="source-image-viewport"><img id="source-frame-image" alt="Original source frame" hidden><svg id="fighter-box-layer" tabindex="0" role="img" aria-label="Draw the selected fighter box on the first analyzed source frame" preserveAspectRatio="xMidYMid meet" hidden></svg></div><figcaption id="source-frame-caption">Original source</figcaption></figure>
+          <p id="fighter-drawing-status" class="caption" role="status"></p>
+          <p id="source-frame-error" class="notice error" role="status" hidden></p>
+          <div class="scrubber">
+            <div class="scrubber-heading"><label for="source-frame">Inspect original source frame</label><output id="source-frame-value" for="source-frame">0</output></div>
+            <input id="source-frame" type="range" min="0" max="0" value="0" step="1">
+            <div class="scrubber-actions"><button id="source-prev" type="button" aria-label="Previous source frame">Previous</button><label class="sr-only" for="source-frame-number">Source frame index</label><input id="source-frame-number" type="number" min="0" max="0" value="0" step="1" inputmode="numeric"><button id="source-next" type="button" aria-label="Next source frame">Next</button><a id="export-source-frame" class="button" download>Export frame PNG</a></div>
+          </div>
+        </div>
+      </section>
+      <section class="module" aria-labelledby="results-title">
+        <div class="section-heading"><span class="index">04</span><h2 id="results-title">Completed run</h2><span id="result-count" class="micro"></span></div>
+        <div id="results-empty" class="empty-state"><p>No completed run for this source.</p><p class="caption">Pose estimates, 2D measurements and heuristic review flags. No action predictions or fighter identity claims.</p></div>
+        <button id="reload-results" type="button" hidden>Retry loading completed run</button>
+        <div id="results" hidden>
+          <p id="result-id" class="caption technical"></p>
+          <p id="saved-warning" class="notice" role="status" hidden>Showing a completed run with its saved provenance. Current source or settings have changed; run analysis again for current settings. These outputs have not been relabeled.</p>
+          <details><summary>Run provenance</summary><pre id="provenance" class="json"></pre></details>
+          <figure class="media-frame"><video id="overlay-video" controls preload="metadata" playsinline aria-label="Completed pose overlay video"></video><figcaption>Completed overlay   saved run settings</figcaption></figure>
+          <div id="phase-ribbon-panel" hidden><svg id="phase-ribbon" viewBox="0 0 800 44" role="group" aria-label="Experimental movement phases; click or press Enter to inspect source frames"></svg><p class="caption">Experimental descriptive phases; see measurements and human-review controls below. Not strikes, intent or tactical success.</p></div>
+          <p id="overlay-codec" class="caption">If this codec cannot play in your browser, use the PNG frame pair or download overlay.mp4.</p>
+          <details><summary>Overlay contact sheet</summary><figure class="media-frame"><img id="contact-sheet" alt="Contact sheet from the completed pose overlay" loading="lazy" hidden><figcaption>Processed overlay samples</figcaption></figure><p id="contact-sheet-error" class="notice error" role="status" hidden></p></details>
+          <section class="review-section" aria-labelledby="frame-review-title">
+            <h3 id="frame-review-title">Original / overlay review</h3>
+            <p id="review-empty" class="caption" hidden>No pose records are available for frame review.</p>
+            <div id="review-controls" class="scrubber">
+              <div class="scrubber-heading"><label for="review-frame">Processed frame</label><output id="review-frame-value" for="review-frame"></output></div>
+              <input id="review-frame" type="range" min="0" max="0" step="1" value="0">
+              <div class="scrubber-actions"><button id="review-prev" type="button">Previous</button><label class="sr-only" for="review-frame-number">Processed record ordinal</label><input id="review-frame-number" type="number" min="0" max="0" step="1" value="0" inputmode="numeric"><button id="review-next" type="button">Next</button></div>
+              <div class="frame-pair">
+                <figure class="media-frame"><img id="original-frame" alt="Original processed source frame" hidden><figcaption id="original-caption">Original</figcaption><p id="original-frame-error" class="caption error" role="status" hidden></p></figure>
+                <figure class="media-frame"><img id="overlay-frame" alt="Pose overlay for the same processed source frame" hidden><figcaption id="overlay-caption">Overlay</figcaption><p id="overlay-frame-error" class="caption error" role="status" hidden></p></figure>
+              </div>
+              <p id="review-flags" class="notice" role="status"></p>
+              <p class="caption">Flags are heuristic review cues, not action labels. Track IDs are not fighter identities.</p>
+              <details><summary>Raw pose record</summary><pre id="raw-record" class="json"></pre></details>
+            </div>
+          </section>
+          <section id="movement-panel" class="review-section" aria-labelledby="movement-title" hidden>
+            <h3 id="movement-title">Movement phases   experimental</h3>
+            <p class="notice">Uncalibrated descriptive movement—not strikes, intent or tactical success. A/B identities and phases need human review. Uncertain evidence is never interpolated.</p>
+            <p id="movement-summary" class="caption" role="status"></p>
+
+            <p class="caption">A closes: violet   B closes: light   Both close: pale violet   Gap opens: grey   Uncertain/excluded: dark. Use the interval selector for narrow segments.</p>
+            <div class="chart-scroll" tabindex="0" aria-label="Hip-center distance"><svg viewBox="0 0 800 260" role="img" aria-label="Distance in pixels over source time"><g id="movement-distance"></g></svg></div>
+            <div class="chart-scroll" tabindex="0" aria-label="Fighter approach contributions"><svg viewBox="0 0 800 260" role="img" aria-label="A and B approach in pixels per second on the same scale"><g id="movement-approach"></g></svg></div>
+            <fieldset id="movement-review-fields">
+              <legend>Human phase review</legend>
+              <label for="phase-review-select">Interval / source frames</label><select id="phase-review-select"></select>
+              <button id="phase-jump" type="button">Inspect interval</button>
+              <label for="phase-verdict">Does the label match the video?</label><select id="phase-verdict"><option value="">Not reviewed</option><option value="correct">Looks correct</option><option value="incorrect">Looks incorrect</option><option value="unclear">Cannot determine</option></select>
+              <label for="phase-review-note">Review note (optional)</label><textarea id="phase-review-note" rows="2" maxlength="2000"></textarea>
+              <button id="record-phase-review" type="button">Record judgment</button><a id="download-phase-reviews" class="button" download="movement-reviews.json">Download review JSON</a>
+              <p id="phase-review-summary" class="caption" role="status">No human review. Download judgments before reloading; they are not saved on the server or in the run ZIP.</p>
+            </fieldset>
+          </section>
+          <section class="review-section" aria-labelledby="features-title">
+            <h3 id="features-title">Track / feature evidence</h3>
+            <p class="caption">View-dependent 2D measurements, not 3D motion or a validated fight classifier.</p>
+            <div class="feature-selectors"><div><label for="track-select">Track ID</label><select id="track-select"></select></div><div><label for="feature-select">Feature</label><select id="feature-select"></select></div></div>
+            <p id="feature-caption" class="caption">X: source time (s). Missing evidence stays missing.</p>
+            <div class="chart-scroll" tabindex="0" role="region" aria-label="Feature chart; scroll horizontally on narrow screens"><svg id="feature-chart" viewBox="0 0 800 260" role="img" aria-labelledby="chart-title chart-description"><title id="chart-title">Track feature over source time</title><desc id="chart-description">Choose a completed track and feature. Missing evidence is shown as gaps.</desc><g id="chart-content"></g></svg></div>
+            <p id="chart-empty" class="caption" hidden>No reliable evidence for this track and feature.</p>
+            <p id="selected-feature" class="caption" role="status"></p>
+          </section>
+          <section id="artifacts" class="review-section" aria-labelledby="artifacts-title">
+            <h3 id="artifacts-title">Run artifacts</h3>
+            <div class="artifact-links"><a class="button" data-artifact="manifest.json" download="manifest.json">manifest.json</a><a class="button" data-artifact="poses.jsonl" download="poses.jsonl">poses.jsonl</a><a class="button" data-artifact="features.csv" download="features.csv">features.csv</a><a class="button" data-artifact="overlay.mp4" download="overlay.mp4">overlay.mp4</a><a class="button" data-artifact="contact_sheet.jpg" download="contact_sheet.jpg">contact_sheet.jpg</a><a class="button primary" data-artifact="masa-run.zip" download="masa-run.zip">Download run ZIP</a></div>
+            <p class="caption">ZIP contains the five core artifacts above; source footage is not included.</p>
+          </section>
+        </div>
+      </section>
+      <footer class="workspace-footer micro">Source-time evidence / saved provenance / local engine</footer>
+    </main>
+  </div>
+  <dialog id="detection-help" aria-labelledby="detection-help-title">
+    <div class="dialog-heading"><h2 id="detection-help-title">Detection confidence</h2><button type="button" data-close="detection-help" aria-label="Close detection confidence help">Close</button></div>
+    <p>The minimum person-detection score accepted by the pose model. Raising it rejects less-confident person detections; lowering it may include more people and more false positives.</p>
+    <p>It is not a joint-confidence threshold and does not identify the intended fighters. Maximum people caps saved observations. Manual box selection chooses the intended targets; the automatic confidence cap can still select spectators.</p>
+  </dialog>
+  <dialog id="keypoint-help" aria-labelledby="keypoint-help-title">
+    <div class="dialog-heading"><h2 id="keypoint-help-title">Keypoint confidence</h2><button type="button" data-close="keypoint-help" aria-label="Close keypoint confidence help">Close</button></div>
+    <p>The minimum joint score used for reliable skeleton connections and derived 2D measurements. Lower-confidence joints may remain as hollow markers; unreliable measurements stay missing.</p>
+    <p>This does not remove background people or change which person detections are accepted. Use Detection confidence for person acceptance. A higher joint score is not proof of correct anatomy.</p>
+  </dialog>
+  <dialog id="model-help" aria-labelledby="model-help-title">
+    <div class="dialog-heading"><h2 id="model-help-title">Pose model reference</h2><button type="button" data-close="model-help" aria-label="Close pose model comparison">Close</button></div>
+    <p>COCO Keypoints val2017   640 px. These are reference benchmarks, not measured on this machine and not fight accuracy.</p>
+    <div class="table-scroll"><table><caption>YOLO11 pose: Nano / Small</caption><thead><tr><th scope="col">Reference metric</th><th scope="col">Nano</th><th scope="col">Small</th></tr></thead><tbody><tr><th scope="row">Model</th><td>yolo11n-pose.pt</td><td>yolo11s-pose.pt</td></tr><tr><th scope="row">Parameters (M)</th><td>2.9</td><td>9.9</td></tr><tr><th scope="row">Compute (GFLOPs)</th><td>7.5</td><td>23.2</td></tr><tr><th scope="row">Pose mAP50–95</th><td>50.0</td><td>58.9</td></tr><tr><th scope="row">Pose mAP50</th><td>81.0</td><td>86.3</td></tr><tr><th scope="row">CPU ONNX (ms)</th><td>52.4</td><td>90.5</td></tr><tr><th scope="row">T4 TensorRT10 (ms)</th><td>1.7</td><td>2.6</td></tr></tbody></table></div>
+    <p>Nano favors speed and lower compute. Small uses more compute for higher COCO pose accuracy. Pose mAP is keypoint accuracy, not bounding-box AP. Hardware, runtime, footage and occlusion change practical results; M.A.S.A. does not claim measured combat accuracy.</p>
+    <a href="https://docs.ultralytics.com/models/yolo11/" target="_blank" rel="noopener noreferrer">Open official YOLO11 reference</a>
+  </dialog>
+</body>
+</html>
