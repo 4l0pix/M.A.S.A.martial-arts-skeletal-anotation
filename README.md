@@ -1,5 +1,5 @@
 # M.A.S.A. v1.0 - Martial Arts Skeletal Annotation
-![M.A.S.A. displaying tracked 2D pose overlays on a fight frame](docs/images/pose-tracking-example.png)
+![M.A.S.A. displaying tracked 2D pose overlays on a fight frame](pose-tracking-example.png)
 
 M.A.S.A. turns a video into tracked 2D pose observations, reviewable overlays, and exportable measurements. It is a local first inspection tool, NOT a strike classifier(yet), verified (yet)fighter-identity system(yet), or fight outcome predictor(will be hopefully).
 
